@@ -79,15 +79,33 @@ export class CartService {
 
   async createWebpayTransaction(cartId: number, totalAmount: number) {
 
-    
     const tx = new WebpayPlus.Transaction(new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration));
    
     const createResponse = await tx.create(cartId.toString(),cartId.toString(),totalAmount, 'http://localhost:4200/products');
-    
+
     return createResponse;
+  }
 
+  //eliminar producto del carrito
+  async deleteProductFromCart(cartId: number, productId: number) {
+    const cart = await this.cartRepository.findOne({ where: { id: cartId }, relations: ['products'] });
+    if (!cart) {
+      throw new NotFoundException('Cart not found');
+    }
 
+    const product = await this.productRepository.findOne({ where: { id: productId } });
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+    
+    const productIndex = cart.products.findIndex(p => p.id === product.id);
+    if (productIndex === -1) {
+      throw new NotFoundException('Product not found in cart');
+    }
 
+    cart.products.splice(productIndex, 1);
+    cart.totalPrice -= product.precio;
+    await this.cartRepository.save(cart);
   }
 
 

@@ -38,8 +38,8 @@ export class CartController {
     return this.cartService.update(+id, updateCartDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.cartService.remove(+id);
+  @Delete(':id/delete/:productId')
+  remove(@Param('id') id: number,@Param('productId') productId:number) {
+    return  this.cartService.deleteProductFromCart(id,productId);
   }
 }
