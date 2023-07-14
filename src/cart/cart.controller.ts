@@ -18,15 +18,11 @@ export class CartController {
     return this.cartService.getCartByUserId(userId);
   }
 
-
   @Post(':cartId/transaction')
   async createWebpayTransaction(@Param('cartId') cartId: number, @Body('totalAmount') totalAmount: number) {
     const response = await this.cartService.createWebpayTransaction(cartId, totalAmount);
     return response;
   }
-
-
-
 
   @Get(':id')
   findOne(@Param('id') id: string) {
