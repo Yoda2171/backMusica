@@ -1,62 +1,77 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { v4 as uuid } from 'uuid';
 import { CreateAuthDto } from './dto/create-auth.dto';
 import { UpdateAuthDto } from './dto/update-auth.dto';
 import { Auth } from './entities/auth.entity';
 import { LoginUserDto } from './dto/login-user.dto';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class AuthService {
-  private users: Auth[] = [
-    { id:'sdasdasda', username:'pablo', password:'123456'},
-  ];
+  constructor(
+    @InjectRepository(Auth)
+    private readonly authRepository: Repository<Auth>,
+  ) {}
 
-  registerUser(createUserDto: CreateAuthDto): Auth {
+ 
+
+  registerUser(createUserDto: CreateAuthDto) {
     const { username, password } = createUserDto;
-    const user: Auth = {
-      id: uuid(),
+
+    const newUser = this.authRepository.create({
       username,
       password,
-    };
-    this.users.push(user);
-    return user;
+    });
+
+    return this.authRepository.save(newUser);
   }
 
-  loginUser(loginUserDto: LoginUserDto): Auth {
+  async loginUser(loginUserDto: LoginUserDto) {
     const { username, password } = loginUserDto;
-    const user = this.users.find((u) => u.username === username && u.password === password);
-    if (!user) {
-      throw new NotFoundException('Invalid username or password');
+
+    try {
+      const dataFind = await this.authRepository.findOne({ where: { username } });
+
+      if (!dataFind) {
+        return {
+          success: false,
+          data: 'Usuario no encontrado',
+        };
+      }
+
+      if (dataFind.password !== password) {
+        return {
+          success: false,
+          data: 'Correo o contraseña Invalida',
+        };
+      }
+
+      return {
+        success: true,
+        data: { ...dataFind },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        data: error,
+      };
     }
-    return user;
   }
 
-  getAllUsers(): Auth[] {
-    return this.users;
+  getAllUsers() {
+
+    
   }
 
-  getUserById(id: string): Auth {
-    const user = this.users.find((u) => u.id === id);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    return user;
+  getUserById(id: string) {
+    
   }
 
-  updateUser(id: string, updateUserDto: UpdateAuthDto): Auth {
-    const { username, password } = updateUserDto;
-    const user = this.getUserById(id);
-    user.username = username;
-    user.password = password;
-    return user;
+  updateUser(id: string, updateUserDto: UpdateAuthDto){
+    
   }
 
   deleteUser(id: string): void {
-    const index = this.users.findIndex((u) => u.id === id);
-    if (index >= 0) {
-      this.users.splice(index, 1);
-    } else {
-      throw new NotFoundException('User not found');
-    }
+    
   }
 }

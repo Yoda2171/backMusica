@@ -1,54 +1,113 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { v4 as uuid } from 'uuid';
+import { BadRequestException, Injectable, NotFoundException, Param } from '@nestjs/common';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
+import { InjectRepository } from '@nestjs/typeorm';
 import { Cart } from './entities/cart.entity';
+import { DeepPartial, Repository } from 'typeorm';
+import { Auth } from 'src/auth/entities/auth.entity';
+import { Product } from 'src/products/entities/product.entity';
+import { WebpayPlus } from 'transbank-sdk'; // ES6 Modules
+import { Options, IntegrationApiKeys, Environment, IntegrationCommerceCodes } from 'transbank-sdk'; // ES6 Modules
+
+import { AxiosResponse } from 'axios';
+import axios from 'axios';
 
 @Injectable()
 export class CartService {
-  private cartItems: Cart[] = [
-    {id: '1', productId: 'Guitarra', quantity: 5000},
-    {id: '2', productId: 'Bajo', quantity: 3000},
-    {id: '3', productId: 'Bateria', quantity: 4000},
+  constructor(
+    @InjectRepository(Cart)
+    private cartRepository: Repository<Cart>,
 
-  ];
+    @InjectRepository(Auth)
+    private authRepository: Repository<Auth>,
 
-  createCartItem(createCartItemDto: CreateCartDto): Cart {
-    const { productId, quantity } = createCartItemDto;
-    const cartItem: Cart = {
-      id: uuid(),
-      productId,
-      quantity,
-    };
-    this.cartItems.push(cartItem);
-    return cartItem;
-  }
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
 
-  getAllCartItems(): Cart[] {
-    return this.cartItems;
-  }
+  ) {}
+  
 
-  getCartItemById(id: string): Cart {
-    const cartItem = this.cartItems.find((item) => item.id === id);
-    if (!cartItem) {
-      throw new NotFoundException('CartItem not found');
+
+  async addToCart(@Param('userId') userId: number, @Param('productId') productId: number) {
+    const auth = await this.authRepository.findOne({ where: { id: userId }});
+    if (!auth) {
+      throw new NotFoundException('User not found');
     }
-    return cartItem;
-  }
-
-  updateCartItem(id: string, updateCartItemDto: UpdateCartDto): Cart {
-    const { quantity } = updateCartItemDto;
-    const cartItem = this.getCartItemById(id);
-    cartItem.quantity = quantity;
-    return cartItem;
-  }
-
-  deleteCartItem(id: string): void {
-    const index = this.cartItems.findIndex((item) => item.id === id);
-    if (index >= 0) {
-      this.cartItems.splice(index, 1);
+  
+    const product = await this.productRepository.findOne({ where: { id: productId }});
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+  
+    const cart = await this.cartRepository.findOne({ where: { userId: auth }, relations: ['products'] });
+  
+    if (cart) {
+      if (cart.products.find(p => p.id === product.id)) {
+        throw new BadRequestException('Product already added to cart');
+      }
+      cart.products.push(product);
+      cart.totalPrice += product.precio;
+      await this.cartRepository.save(cart); // Guardar el carrito actualizado en la base de datos
     } else {
-      throw new NotFoundException('CartItem not found');
+      const newCart = this.cartRepository.create({
+        userId: auth,
+        products: [product],
+        totalPrice: product.precio,
+        createdAt: new Date().toISOString(),
+      });
+  
+      await this.cartRepository.save(newCart); // Guardar el nuevo carrito en la base de datos
     }
+  
+
+  }
+
+
+
+
+  async getCartByUserId(userId: number): Promise<Cart> {
+    const user = await this.authRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+  
+    const cart = await this.cartRepository.findOne({ where: { userId:user }, relations: ['products'] });
+    return cart;
+  }
+
+
+
+  async createWebpayTransaction(cartId: number, totalAmount: number) {
+
+    
+    const tx = new WebpayPlus.Transaction(new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration));
+   
+    const createResponse = await tx.create(cartId.toString(),cartId.toString(),totalAmount, 'http://localhost:4200/products');
+    
+    return createResponse;
+
+
+
+  }
+
+
+
+  findAll() {
+    return `This action returns all cart`;
+  }
+
+
+  
+
+  findOne(id: number) {
+    return `This action returns a #${id} cart`;
+  }
+
+  update(id: number, updateCartDto: UpdateCartDto) {
+    return `This action updates a #${id} cart`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} cart`;
   }
 }

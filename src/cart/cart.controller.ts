@@ -1,35 +1,45 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CreateCartDto } from './dto/create-cart.dto';
 import { UpdateCartDto } from './dto/update-cart.dto';
+import { Cart } from './entities/cart.entity';
 
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() createCartItemDto: CreateCartDto) {
-    return this.cartService.createCartItem(createCartItemDto);
+  @Post(':userId/add/:productId')
+  async addToCart(@Param('userId') userId: number, @Param('productId') productId: number) {
+    await this.cartService.addToCart(userId, productId);
   }
 
-  @Get()
-  findAll() {
-    return this.cartService.getAllCartItems();
+  @Get(':userId')
+  async getCartByUserId(@Param('userId') userId: number): Promise<Cart> {
+    return this.cartService.getCartByUserId(userId);
   }
+
+
+  @Post(':cartId/transaction')
+  async createWebpayTransaction(@Param('cartId') cartId: number, @Body('totalAmount') totalAmount: number) {
+    const response = await this.cartService.createWebpayTransaction(cartId, totalAmount);
+    return response;
+  }
+
+
+
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.cartService.getCartItemById(id);
+    return this.cartService.findOne(+id);
   }
 
-  @Put(':id')
-  update(@Param('id') id: string, @Body() updateCartItemDto: UpdateCartDto) {
-    return this.cartService.updateCartItem(id, updateCartItemDto);
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateCartDto: UpdateCartDto) {
+    return this.cartService.update(+id, updateCartDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.cartService.deleteCartItem(id);
+    return this.cartService.remove(+id);
   }
 }
